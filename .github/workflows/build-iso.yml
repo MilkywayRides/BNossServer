@@ -1,0 +1,50 @@
+name: Build BNoss Server ISO
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y debootstrap squashfs-tools xorriso isolinux syslinux-efi grub-pc-bin grub-efi-amd64-bin mtools dosfstools
+    
+    - name: Download Linux kernel
+      run: |
+        mkdir -p kernel
+        cd kernel
+        KERNEL_VERSION="6.6.15"
+        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+        tar xf linux-${KERNEL_VERSION}.tar.xz
+        echo "KERNEL_VERSION=${KERNEL_VERSION}" >> $GITHUB_ENV
+    
+    - name: Build custom ISO
+      run: sudo bash build-iso.sh
+    
+    - name: Upload ISO artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: bnoss-server-iso
+        path: bnoss-server-*.iso
+        retention-days: 30
+    
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: BNoss Server v${{ github.run_number }}
+        files: bnoss-server-*.iso
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

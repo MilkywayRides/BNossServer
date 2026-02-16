@@ -1,0 +1,6 @@
+build/
+kernel/
+*.iso
+*.img
+*.log
+.DS_Store
