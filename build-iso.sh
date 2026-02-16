@@ -58,8 +58,8 @@ apt-get install -y \
     apt-transport-https \
     locales \
     tzdata \
-    grub-pc \
-    grub-efi-amd64
+    grub-pc-bin \
+    grub-common
 
 # Configure locale
 locale-gen en_US.UTF-8
@@ -73,8 +73,8 @@ useradd -m -s /bin/bash -G sudo bnoss
 echo "bnoss:bnoss" | chpasswd
 
 # Enable services
-systemctl enable NetworkManager
-systemctl enable ssh
+systemctl enable NetworkManager 2>/dev/null || true
+systemctl enable ssh 2>/dev/null || true
 
 # Clean up
 apt-get clean
