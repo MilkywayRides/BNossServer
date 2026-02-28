@@ -1,0 +1,58 @@
+// BlazeNeuro Plymouth Boot Splash Script
+
+// Background
+Window.SetBackgroundTopColor(0.06, 0.07, 0.11);
+Window.SetBackgroundBottomColor(0.10, 0.10, 0.15);
+
+// Logo (centered)
+logo_image = Image("logo.png");
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetX(Window.GetWidth() / 2 - logo_image.GetWidth() / 2);
+logo_sprite.SetY(Window.GetHeight() / 2 - logo_image.GetHeight() / 2 - 40);
+logo_sprite.SetZ(10);
+
+// Progress bar
+progress_box_image = Image("progress-bar.png");
+progress_bar_image = Image("progress-bar-fill.png");
+
+// If images don't exist, use procedural drawing
+fun refresh_callback() {
+    // Pulse the logo opacity for a breathing effect
+    time = Plymouth.GetTime();
+    alpha = Math.Abs(Math.Sin(time * 1.5)) * 0.3 + 0.7;
+    logo_sprite.SetOpacity(alpha);
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+// Message display
+message_sprite = Sprite();
+message_sprite.SetPosition(Window.GetWidth() / 2, Window.GetHeight() - 60, 10);
+
+fun message_callback(text) {
+    msg_image = Image.Text(text, 0.75, 0.77, 0.87);
+    message_sprite = Sprite(msg_image);
+    message_sprite.SetX(Window.GetWidth() / 2 - msg_image.GetWidth() / 2);
+    message_sprite.SetY(Window.GetHeight() - 60);
+}
+
+Plymouth.SetMessageFunction(message_callback);
+
+// Password prompt
+fun display_password_callback(prompt, bullets) {
+    prompt_image = Image.Text(prompt, 0.75, 0.77, 0.87);
+    prompt_sprite = Sprite(prompt_image);
+    prompt_sprite.SetX(Window.GetWidth() / 2 - prompt_image.GetWidth() / 2);
+    prompt_sprite.SetY(Window.GetHeight() / 2 + 60);
+
+    bullet_string = "";
+    for (i = 0; i < bullets; i++) {
+        bullet_string += "● ";
+    }
+    bullet_image = Image.Text(bullet_string, 0.48, 0.64, 0.97);
+    bullet_sprite = Sprite(bullet_image);
+    bullet_sprite.SetX(Window.GetWidth() / 2 - bullet_image.GetWidth() / 2);
+    bullet_sprite.SetY(Window.GetHeight() / 2 + 90);
+}
+
+Plymouth.SetDisplayPasswordFunction(display_password_callback);

@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=BlazeNeuro
+Description=BlazeNeuro boot splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/blazeneuro
+ScriptFile=/usr/share/plymouth/themes/blazeneuro/blazeneuro.script

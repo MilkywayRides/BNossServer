@@ -1,4 +1,4 @@
-name: Build BNoss Server ISO
+name: Build BlazeNeuro ISO
 
 on:
   push:
@@ -14,37 +14,68 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+        df -h /
     
-    - name: Install dependencies
+    - name: Install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y debootstrap squashfs-tools xorriso isolinux syslinux-efi grub-pc-bin grub-efi-amd64-bin mtools dosfstools
+        sudo apt-get install -y \
+          debootstrap \
+          squashfs-tools \
+          xorriso \
+          isolinux \
+          syslinux-efi \
+          syslinux-utils \
+          grub-pc-bin \
+          grub-efi-amd64-bin \
+          grub-common \
+          grub2-common \
+          mtools \
+          dosfstools \
+          parted
     
-    - name: Download Linux kernel
-      run: |
-        mkdir -p kernel
-        cd kernel
-        KERNEL_VERSION="6.6.15"
-        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
-        tar xf linux-${KERNEL_VERSION}.tar.xz
-        echo "KERNEL_VERSION=${KERNEL_VERSION}" >> $GITHUB_ENV
-    
-    - name: Build custom ISO
+    - name: Build BlazeNeuro ISO
       run: sudo bash build-iso.sh
+
+    - name: List build output
+      run: ls -lh blazeneuro-*.iso
     
     - name: Upload ISO artifact
       uses: actions/upload-artifact@v4
       with:
-        name: bnoss-server-iso
-        path: bnoss-server-*.iso
+        name: blazeneuro-iso
+        path: blazeneuro-*.iso
         retention-days: 30
     
     - name: Create Release
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ github.run_number }}
-        name: BNoss Server v${{ github.run_number }}
-        files: bnoss-server-*.iso
+        name: BlazeNeuro v${{ github.run_number }}
+        body: |
+          ## BlazeNeuro Linux
+          
+          **Debian-based Linux distribution with XFCE4 desktop.**
+          
+          ### Default Credentials
+          - User: `blazeneuro`
+          - Password: `blazeneuro`
+          
+          ### Features
+          - Debian Bookworm base
+          - XFCE4 Desktop Environment
+          - LightDM Display Manager
+          - BIOS + UEFI boot support
+          - Live boot + Install capability
+          
+          > ⚠️ Change the default password after installation!
+        files: blazeneuro-*.iso
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

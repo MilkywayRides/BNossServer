@@ -1,0 +1,10 @@
+PRETTY_NAME="BlazeNeuro 1.0 (ignite)"
+NAME="BlazeNeuro"
+VERSION_ID="1.0"
+VERSION="1.0 (ignite)"
+VERSION_CODENAME=ignite
+ID=blazeneuro
+ID_LIKE=debian
+HOME_URL="https://github.com/MilkywayRides/BNossServer"
+SUPPORT_URL="https://github.com/MilkywayRides/BNossServer/issues"
+BUG_REPORT_URL="https://github.com/MilkywayRides/BNossServer/issues"

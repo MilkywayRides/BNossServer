@@ -1,6 +1,22 @@
+# Build artifacts
 build/
 kernel/
+
+# ISO output
 *.iso
 *.img
+
+# Temporary files
 *.log
+*.tmp
+*.swp
+*~
 .DS_Store
+
+# Editor directories
+.vscode/
+.idea/
+*.kate-swp
+
+# OS generated
+Thumbs.db
