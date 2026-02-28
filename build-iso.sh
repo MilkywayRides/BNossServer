@@ -14,10 +14,14 @@ DISTRO_URL="https://github.com/MilkywayRides/BNossServer"
 WORK_DIR="$(pwd)/build"
 ISO_DIR="${WORK_DIR}/iso"
 ROOTFS_DIR="${WORK_DIR}/rootfs"
+KERNEL_DIR="${WORK_DIR}/kernel"
 ISO_NAME="blazeneuro-${DISTRO_VERSION}-amd64-$(date +%Y%m%d).iso"
 DEBIAN_MIRROR="http://deb.debian.org/debian"
 DEBIAN_SUITE="bookworm"
 ARCH="amd64"
+
+KERNEL_VERSION="6.6.75"
+KERNEL_MAJOR="$(echo ${KERNEL_VERSION} | cut -d. -f1)"
 
 DEFAULT_USER="blazeneuro"
 DEFAULT_PASS="blazeneuro"
@@ -96,6 +100,116 @@ phase1_bootstrap() {
 }
 
 # ============================================================================
+#  PHASE 1.5 — Download and compile Linux kernel from kernel.org
+# ============================================================================
+phase1_5_kernel() {
+    log "Phase 1.5: Compiling Linux kernel ${KERNEL_VERSION} from kernel.org..."
+
+    mkdir -p "${KERNEL_DIR}"
+
+    # Download kernel source
+    local kernel_url="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz"
+    local kernel_tarball="${KERNEL_DIR}/linux-${KERNEL_VERSION}.tar.xz"
+
+    if [[ ! -f "${kernel_tarball}" ]]; then
+        info "Downloading kernel from ${kernel_url}..."
+        wget -q --show-progress -O "${kernel_tarball}" "${kernel_url}"
+    else
+        info "Kernel tarball already exists, skipping download."
+    fi
+
+    # Extract
+    info "Extracting kernel source..."
+    tar xf "${kernel_tarball}" -C "${KERNEL_DIR}"
+    local kernel_src="${KERNEL_DIR}/linux-${KERNEL_VERSION}"
+
+    # Configure kernel
+    info "Configuring kernel with defconfig..."
+    make -C "${kernel_src}" defconfig
+
+    # Enable important options for a desktop distro
+    "${kernel_src}/scripts/config" --file "${kernel_src}/.config" \
+        --enable CONFIG_SMP \
+        --enable CONFIG_PREEMPT \
+        --enable CONFIG_NO_HZ_FULL \
+        --enable CONFIG_HIGH_RES_TIMERS \
+        --enable CONFIG_CGROUPS \
+        --enable CONFIG_NAMESPACES \
+        --enable CONFIG_NET_NS \
+        --enable CONFIG_SECCOMP \
+        --enable CONFIG_SECCOMP_FILTER \
+        --enable CONFIG_SECURITY \
+        --enable CONFIG_EXT4_FS \
+        --enable CONFIG_BTRFS_FS \
+        --enable CONFIG_XFS_FS \
+        --enable CONFIG_NTFS3_FS \
+        --enable CONFIG_VFAT_FS \
+        --enable CONFIG_FUSE_FS \
+        --enable CONFIG_OVERLAY_FS \
+        --enable CONFIG_SQUASHFS \
+        --enable CONFIG_SQUASHFS_XZ \
+        --enable CONFIG_BLK_DEV_LOOP \
+        --enable CONFIG_BLK_DEV_DM \
+        --enable CONFIG_DRM \
+        --enable CONFIG_DRM_I915 \
+        --enable CONFIG_DRM_AMDGPU \
+        --enable CONFIG_DRM_NOUVEAU \
+        --enable CONFIG_FB \
+        --enable CONFIG_FRAMEBUFFER_CONSOLE \
+        --enable CONFIG_SOUND \
+        --enable CONFIG_SND \
+        --enable CONFIG_SND_HDA_INTEL \
+        --enable CONFIG_USB \
+        --enable CONFIG_USB_XHCI_HCD \
+        --enable CONFIG_USB_EHCI_HCD \
+        --enable CONFIG_USB_STORAGE \
+        --enable CONFIG_INPUT_EVDEV \
+        --enable CONFIG_INPUT_KEYBOARD \
+        --enable CONFIG_INPUT_MOUSE \
+        --enable CONFIG_WLAN \
+        --enable CONFIG_IWLWIFI \
+        --enable CONFIG_BT \
+        --enable CONFIG_MODULES \
+        --enable CONFIG_MODULE_UNLOAD \
+        --set-str CONFIG_LOCALVERSION "-blazeneuro"
+
+    # Resolve any new dependencies
+    make -C "${kernel_src}" olddefconfig
+
+    # Compile kernel
+    local nproc_count
+    nproc_count=$(nproc)
+    info "Compiling kernel with ${nproc_count} threads (this will take a while)..."
+    make -C "${kernel_src}" -j"${nproc_count}" bzImage modules
+
+    # Install kernel into rootfs
+    info "Installing kernel into rootfs..."
+    make -C "${kernel_src}" INSTALL_MOD_PATH="${ROOTFS_DIR}" modules_install
+    make -C "${kernel_src}" INSTALL_PATH="${ROOTFS_DIR}/boot" install
+
+    # Copy the kernel image explicitly
+    cp "${kernel_src}/arch/x86/boot/bzImage" "${ROOTFS_DIR}/boot/vmlinuz-${KERNEL_VERSION}-blazeneuro"
+
+    # Generate initramfs inside chroot
+    mount --bind /dev  "${ROOTFS_DIR}/dev"
+    mount --bind /proc "${ROOTFS_DIR}/proc"
+    mount --bind /sys  "${ROOTFS_DIR}/sys"
+    mount --bind /run  "${ROOTFS_DIR}/run"
+    mount -t devpts devpts "${ROOTFS_DIR}/dev/pts"
+
+    chroot "${ROOTFS_DIR}" /bin/bash << INITRD_EOF
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y initramfs-tools kmod
+update-initramfs -c -k ${KERNEL_VERSION}-blazeneuro
+INITRD_EOF
+
+    cleanup
+
+    log "Custom kernel ${KERNEL_VERSION}-blazeneuro compiled and installed."
+}
+
+# ============================================================================
 #  PHASE 2 — Configure system inside chroot
 # ============================================================================
 phase2_configure() {
@@ -137,8 +251,9 @@ sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
 locale-gen en_US.UTF-8
 update-locale LANG=en_US.UTF-8
 
-# ── Install Linux kernel ──
-apt-get install -y linux-image-amd64 linux-headers-amd64 firmware-linux-free
+# ── Install kernel build dependencies & firmware ──
+# (custom kernel is compiled externally and installed into rootfs)
+apt-get install -y firmware-linux-free initramfs-tools kmod
 
 # ── Install live boot system ──
 apt-get install -y live-boot live-boot-initramfs-tools live-config live-config-systemd
@@ -607,6 +722,7 @@ EOF
     echo ""
     echo -e "  ${CYAN}Boot:${NC} BIOS (ISOLINUX) + UEFI (GRUB)"
     echo -e "  ${CYAN}Base:${NC} Debian ${DEBIAN_SUITE} (${ARCH})"
+    echo -e "  ${CYAN}Kernel:${NC} ${KERNEL_VERSION}-blazeneuro (from kernel.org)"
     echo -e "  ${CYAN}Desktop:${NC} XFCE4 + LightDM"
     echo -e "  ${CYAN}User:${NC} ${DEFAULT_USER} / ${DEFAULT_PASS}"
     echo ""
@@ -625,6 +741,7 @@ main() {
     echo ""
 
     phase1_bootstrap
+    phase1_5_kernel
     phase2_configure
     phase3_branding
     phase4_build_iso

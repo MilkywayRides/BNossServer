@@ -38,7 +38,17 @@ jobs:
           grub2-common \
           mtools \
           dosfstools \
-          parted
+          parted \
+          build-essential \
+          libncurses-dev \
+          flex \
+          bison \
+          libssl-dev \
+          libelf-dev \
+          bc \
+          cpio \
+          dwarves \
+          wget
     
     - name: Build BlazeNeuro ISO
       run: sudo bash build-iso.sh
